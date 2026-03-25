@@ -12,7 +12,7 @@ Monitor in tmux, detect anomalies, analyze errors, provide fix suggestions.
 
 Create a sleep script for tmux monitoring:
 
-1. create `/tmp/wait_tmux.py`
+1. create `./tmp/wait_tmux.py`
 
 ```python
 import argparse
@@ -68,7 +68,7 @@ if __name__ == "__main__":
 当你需要监控一个tmux窗口时，运行：
 
 ```bash
-python /tmp/tmux_wait.py my_session_name 30
+python ./tmp/tmux_wait.py my_session_name 30
 ```
 
 意思是：
@@ -93,3 +93,87 @@ YOU SHOULD USE: `python ./tmux_wait.py my_session_name 30 && tmux capture-pane -
 - 60 seconds is too long
 - always use `python ./tmux_wait.py` to wait
 
+
+
+
+## Example:
+
+
+### without ssh example
+
+0 example available
+
+
+### with ssh example
+
+1 example available
+
+```agent
+
+--- example user instruction begin ---
+login
+ssh root@localhost -p 8824
+goto
+/mnt/data_cpfs/qingxu.fu/agentjet/good-luck-agentjet
+run with venv and monitor
+source .venv/bin/activate && python -m ajet.launcher --conf tests/bench/benchmark_math/benchmark_math.yaml --autokill
+--- example user instruction end ---
+
+--- example agent reaction begin ---
+The user wants me to monitor a tmux session while running a training job. Let me break down what they're asking:
+1. SSH into a remote machine (root@localhost -p 8824)
+2. Go to a specific directory
+3. Activate a virtual environment and run a Python command
+4. Monitor the tmux session
+
+# Wrote ./tmp/tmux_wait.py
+....
+
+# Create tmux session for training
+$ tmux new-session -d -s agentjet -c "/mnt/data_cpfs/qingxu.fu/agentjet/good-luck-agentjet"
+...
+
+# Send SSH command to tmux session
+$ tmux send-keys -t agentjet "ssh root@localhost -p 8824" Enter
+...
+
+# Wait and check SSH connection
+$ python3 /tmp/tmux_wait.py agentjet 10 && tmux capture-pane -t agentjet -p | tail -20
+SSH connected successfully. Now I need to navigate to the directory and run the training command. Let me send the commands to the tmux session.
+...
+
+# Navigate to working directory
+$ tmux send-keys -t agentjet "cd /mnt/data_cpfs/qingxu.fu/agentjet/good-luck-agentjet" Enter
+...
+
+# Start training with venv and launcher
+$ tmux send-keys -t agentjet "source .venv/bin/activate && python -m ajet.launcher --conf tests/bench/benchmark_math/benchmark_math.yaml --autokill" Enter
+...
+
+# Capture initial training output
+$ tmux capture-pane -t agentjet -p | tail -40
+...
+
+# Wait 30s and check training progress
+$ python3 /tmp/tmux_wait.py agentjet 30 && tmux capture-pane -t agentjet -p | tail -50
+...
+Training is running. The command is executing properly. Let me continue monitoring at 1 minute intervals.
+
+# Wait 1min and check training progress
+$ python3 /tmp/tmux_wait.py agentjet 60 && tmux capture-pane -t agentjet -p | tail -50
+...
+
+# Wait 2min and check training progress
+$ python3 /tmp/tmux_wait.py agentjet 120 && tmux capture-pane -t agentjet -p | tail -60
+...
+Training is progressing well. Checkpoints loaded, vLLM server started, swanlab is tracking the run. No errors so far, just warnings. Let me continue monitoring.
+
+# Wait 4min and check training progress
+$ python3 /tmp/tmux_wait.py agentjet 240 && tmux capture-pane -t agentjet -p | tail -60
+...
+
+... many other rounds ...
+
+--- example agent reaction end ---
+
+```
