@@ -1,0 +1,107 @@
+---
+name: monitor-with-tmux
+description: Monitor training progress by reading tmux content at exponential backoff intervals (30s, 1min, 2min, 4min, 8min...), analyze logs when anomalies occur, and provide fix suggestions
+license: Complete terms in LICENSE.txt
+---
+
+# Monitor with Tmux
+
+Monitor in tmux, detect anomalies, analyze errors, provide fix suggestions.
+
+## Step Zero
+
+Create a sleep script for tmux monitoring:
+
+1. create `/tmp/wait_tmux.py`
+
+```python
+import argparse
+import subprocess
+import time
+
+SHELLS = {"bash", "zsh", "sh", "fish", "csh", "tcsh", "ksh", "dash", "ash"}
+
+def smart_sleep(session: str, seconds: float, check_every: float = 2.0) -> bool:
+    """
+    替代 time.sleep()，但在命令结束时提前返回。
+
+    Returns:
+        True  - 正常超时（命令还在跑）
+        False - 提前返回（命令结束了或session没了）
+    """
+    end_time = time.time() + seconds
+    while time.time() < end_time:
+        try:
+            r = subprocess.run(
+                ["tmux", "list-panes", "-F", "#{pane_current_command}", "-t", session],
+                capture_output=True, text=True, timeout=5
+            )
+            if r.returncode != 0:
+                return False  # session没了
+            cmds = [l.strip().lower() for l in r.stdout.splitlines() if l.strip()]
+            if not any(c not in SHELLS for c in cmds):
+                return False  # 命令结束了，回到shell
+        except Exception:
+            return False
+
+        time.sleep(min(check_every, end_time - time.time()))
+
+    return True
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Wait for a tmux session with smart early-exit.")
+    parser.add_argument("session", help="tmux session name")
+    parser.add_argument("seconds", type=float, help="total seconds to wait")
+    args = parser.parse_args()
+
+    timed_out = smart_sleep(args.session, args.seconds, 2)
+    raise SystemExit(0 if timed_out else 1)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+## Begin Monitor
+
+当你需要监控一个tmux窗口时，运行：
+
+```bash
+python /tmp/tmux_wait.py my_session_name 30
+```
+
+意思是：
+1. 监控名字为 my_session_name 的tmux session
+2. 等待30秒
+
+- 退出码 0：正常超时（命令仍在运行）
+- 退出码 1：命令提前结束或 session 消失
+
+## Working with ssh
+
+when working with ssh, always use a local tmux window to set up ssh connection
+
+## When you want to delay a while before reading tmux window again
+
+必须要具备出错即时返回功能，即不能使用 `sleep xxx`，而是使用 `python ./tmux_wait.py my_session_name xxx`
+
+DO NOT USE: `sleep 60 && tmux capture-pane -t my_session_name -p | tail -80`
+
+YOU SHOULD USE: `python ./tmux_wait.py my_session_name 30 && tmux capture-pane -t my_session_name -p | tail -80`
+
+- 60 seconds is too long
+- always use `python ./tmux_wait.py` to wait
+
+
+
+----
+
+login
+ssh root@localhost -p 8824
+
+goto
+/mnt/data_cpfs/qingxu.fu/agentjet/good-luck-agentjet
+
+run with venv and monitor
+source .venv/bin/activate && python -m ajet.launcher --conf tests/bench/benchmark_math/benchmark_math.yaml --autokill
